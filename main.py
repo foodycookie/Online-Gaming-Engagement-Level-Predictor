@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------------------------------------------------------------
-# IMPORT
+# Import
 # ----------------------------------------------------------------------------------------------------------------------------------
 
 import joblib
@@ -7,15 +7,21 @@ import math
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pandas as pd
 import seaborn as sns
+import warnings
+
+os.makedirs("model", exist_ok=True)
+os.makedirs("photo", exist_ok=True)
+
+warnings.filterwarnings('ignore')
 
 from imblearn.over_sampling import SMOTE
 from scipy.stats import chi2_contingency
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay, f1_score, precision_score, recall_score
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 
@@ -85,146 +91,153 @@ for col in numeric_cols:
 
 categorical_cols = list(df.select_dtypes(include=['object']).columns) + ['InGamePurchases', "PlayerLevel"]
 
-print("\nUnique values in categorical columns:")
+print("Unique values in categorical columns:")
 for col in categorical_cols:
     print(f"\n{col}:")
     print(df[col].unique())
     
 # ----------------------------------------------------------------------------------------------------------------------------------
-# Data Visualization (For Report Purpose Only)
+# Data Visualization
 # ----------------------------------------------------------------------------------------------------------------------------------
 
-# sns.set_theme(style="whitegrid")
-# total = len(df)
+sns.set_theme(style="whitegrid")
+total = len(df)
 
-# BIN_THRESHOLD = 20
-# BIN_STEP = 10
+BIN_THRESHOLD = 20
+BIN_STEP = 10
 
-# def apply_binning(series):
-#     min_v = (series.min() // BIN_STEP) * BIN_STEP
-#     max_v = (series.max() // BIN_STEP) * BIN_STEP + BIN_STEP
-#     bins  = range(int(min_v), int(max_v) + BIN_STEP, BIN_STEP)
-#     labels = [f"{b}–{b + BIN_STEP - 1}" for b in bins[:-1]]
-#     binned = pd.cut(series, bins=list(bins), labels=labels, right=False, include_lowest=True)
-#     return binned.astype(str)
+def apply_binning(series):
+    min_v = (series.min() // BIN_STEP) * BIN_STEP
+    max_v = (series.max() // BIN_STEP) * BIN_STEP + BIN_STEP
+    bins  = range(int(min_v), int(max_v) + BIN_STEP, BIN_STEP)
+    labels = [f"{b}–{b + BIN_STEP - 1}" for b in bins[:-1]]
+    binned = pd.cut(series, bins=list(bins), labels=labels, right=False, include_lowest=True)
+    return binned.astype(str)
 
-# cols_to_plot = df.columns.tolist()
-# n_cols = 2
-# n_rows = math.ceil(len(cols_to_plot) / n_cols)
+# Data Viualization
+cols_to_plot = df.columns.tolist()
+n_cols = 2
+n_rows = math.ceil(len(cols_to_plot) / n_cols)
 
-# fig, axes = plt.subplots(n_rows, n_cols, figsize=(28, 6 * n_rows))
-# axes = axes.flatten()
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(28, 6 * n_rows))
+axes = axes.flatten()
 
-# for i, col in enumerate(cols_to_plot):
-#     ax = axes[i]
+for i, col in enumerate(cols_to_plot):
+    ax = axes[i]
 
-#     if df[col].nunique() > BIN_THRESHOLD:
-#         plot_series = apply_binning(df[col])
-#         order = sorted(plot_series.dropna().unique(),
-#                        key=lambda x: int(x.split('–')[0]))
-#         is_binned = True
-#     else:
-#         plot_series = df[col].astype(str)
-#         order = sorted(plot_series.dropna().unique(),
-#                        key=lambda x: int(x) if x.lstrip('-').isdigit() else x)
-#         is_binned = False
+    if df[col].nunique() > BIN_THRESHOLD:
+        plot_series = apply_binning(df[col])
+        order = sorted(plot_series.dropna().unique(),
+                       key=lambda x: int(x.split('–')[0]))
+        is_binned = True
+    else:
+        plot_series = df[col].astype(str)
+        order = sorted(plot_series.dropna().unique(),
+                       key=lambda x: int(x) if x.lstrip('-').isdigit() else x)
+        is_binned = False
 
-#     temp_df = plot_series.rename(col).to_frame()
-#     sns.countplot(data=temp_df, x=col, ax=ax, palette='viridis', order=order)
+    temp_df = plot_series.rename(col).to_frame()
+    sns.countplot(data=temp_df, x=col, ax=ax, palette='viridis', order=order)
 
-#     for p in ax.patches:
-#         height = p.get_height()
-#         if height == 0:
-#             continue
-#         ax.annotate(
-#             f'{int(height)}\n({100 * height / total:.1f}%)',
-#             (p.get_x() + p.get_width() / 2., height),
-#             ha='center', va='center',
-#             xytext=(0, 18),
-#             textcoords='offset points',
-#             fontsize=8, fontweight='bold'
-#         )
+    for p in ax.patches:
+        height = p.get_height()
+        if height == 0:
+            continue
+        ax.annotate(
+            f'{int(height)}\n({100 * height / total:.1f}%)',
+            (p.get_x() + p.get_width() / 2., height),
+            ha='center', va='center',
+            xytext=(0, 18),
+            textcoords='offset points',
+            fontsize=8, fontweight='bold'
+        )
 
-#     ax.set_title(f'Distribution of {col}' + (' (binned)' if is_binned else ''),
-#                  fontsize=11, fontweight='bold')
-#     ax.set_ylim(0, plot_series.value_counts().max() * 1.35)
-#     ax.tick_params(axis='x', rotation=45)
-#     ax.set_xlabel('')
+    ax.set_title(f'Distribution of {col}' + (' (binned)' if is_binned else ''),
+                 fontsize=11, fontweight='bold')
+    ax.set_ylim(0, plot_series.value_counts().max() * 1.35)
+    ax.tick_params(axis='x', rotation=45)
+    ax.set_xlabel('')
 
-#     n_bars = len(order)
-#     ax.set_xlim(-0.5, n_bars - 0.5)
-#     fig.subplots_adjust(wspace=0.4)
+    n_bars = len(order)
+    ax.set_xlim(-0.5, n_bars - 0.5)
+    fig.subplots_adjust(wspace=0.4)
 
-# for j in range(i + 1, len(axes)):
-#     fig.delaxes(axes[j])
+for j in range(i + 1, len(axes)):
+    fig.delaxes(axes[j])
 
-# plt.tight_layout()
-# plt.show()
+plt.tight_layout()
+_fname = "photo/feature_data_visualisation.png"
+plt.savefig(_fname, bbox_inches='tight')
+plt.close()
+print(f'\nFile saved "{_fname}"')
 
-# ----------------------------------------------------------------------------------------------------------------------------------
+# # ----------------------------------------------------------------------------------------------------------------------------------
 
-#Correlation Analysis
-# numeric_cols = df.select_dtypes(include=np.number).columns
-# numeric_cols = numeric_cols.drop(["InGamePurchases", "PlayerLevel"])
-# numeric_cols = numeric_cols.tolist()
+# Correlation Analysis
+numeric_cols = df.select_dtypes(include=np.number).columns
+numeric_cols = numeric_cols.drop(["InGamePurchases", "PlayerLevel"])
+numeric_cols = numeric_cols.tolist()
 
-# categorical_cols = list(df.select_dtypes(include=['object']).columns) + ['InGamePurchases', "PlayerLevel"]
+categorical_cols = list(df.select_dtypes(include=['object']).columns) + ['InGamePurchases', "PlayerLevel"]
 
-# print("\nNumeric Correlation (Pearson)")
-# print(df[numeric_cols].corr().round(2).to_string())
+print("\nNumeric Correlation (Pearson)")
+print(df[numeric_cols].corr().round(2).to_string())
 
-# def cramers_v(col1, col2):
-#     confusion_matrix = pd.crosstab(col1, col2)
-#     chi2 = chi2_contingency(confusion_matrix)[0]
-#     n = confusion_matrix.sum().sum()
-#     r, k = confusion_matrix.shape
-#     return np.sqrt(chi2 / (n * (min(r, k) - 1)))
+def cramers_v(col1, col2):
+    confusion_matrix = pd.crosstab(col1, col2)
+    chi2 = chi2_contingency(confusion_matrix)[0]
+    n = confusion_matrix.sum().sum()
+    r, k = confusion_matrix.shape
+    return np.sqrt(chi2 / (n * (min(r, k) - 1)))
 
-# print("\nCategorical Correlation (Cramér's V)")
-# cramers_matrix = pd.DataFrame(index=categorical_cols, columns=categorical_cols, dtype=float)
-# for col1 in categorical_cols:
-#     for col2 in categorical_cols:
-#         cramers_matrix.loc[col1, col2] = cramers_v(df[col1], df[col2])
-# print(cramers_matrix.round(2).to_string())
+print("\nCategorical Correlation (Cramér's V)")
+cramers_matrix = pd.DataFrame(index=categorical_cols, columns=categorical_cols, dtype=float)
+for col1 in categorical_cols:
+    for col2 in categorical_cols:
+        cramers_matrix.loc[col1, col2] = cramers_v(df[col1], df[col2])
+print(cramers_matrix.round(2).to_string())
 
-# def eta_squared(num_col, cat_col):
-#     groups = [group.values for _, group in num_col.groupby(cat_col)]
-#     grand_mean = num_col.mean()
-#     ss_between = sum(len(g) * (g.mean() - grand_mean) ** 2 for g in groups)
-#     ss_total   = sum((x - grand_mean) ** 2 for g in groups for x in g)
-#     return ss_between / ss_total if ss_total != 0 else 0
+def eta_squared(num_col, cat_col):
+    groups = [group.values for _, group in num_col.groupby(cat_col)]
+    grand_mean = num_col.mean()
+    ss_between = sum(len(g) * (g.mean() - grand_mean) ** 2 for g in groups)
+    ss_total   = sum((x - grand_mean) ** 2 for g in groups for x in g)
+    return ss_between / ss_total if ss_total != 0 else 0
 
-# print("Numeric-Categorical Correlation (Eta Squared)")
-# eta_matrix = pd.DataFrame(index=numeric_cols, columns=categorical_cols, dtype=float)
-# for num in numeric_cols:
-#     for cat in categorical_cols:
-#         eta_matrix.loc[num, cat] = eta_squared(df[num], df[cat])
-# print(eta_matrix.round(2).to_string())
+print("\nNumeric-Categorical Correlation (Eta Squared)")
+eta_matrix = pd.DataFrame(index=numeric_cols, columns=categorical_cols, dtype=float)
+for num in numeric_cols:
+    for cat in categorical_cols:
+        eta_matrix.loc[num, cat] = eta_squared(df[num], df[cat])
+print(eta_matrix.round(2).to_string())
 
-# # Plotting
-# fig, axes = plt.subplots(1, 3, figsize=(24, 7))
-# fig.suptitle('Correlation Analysis', fontsize=16, fontweight='bold')
+# Plotting
+fig, axes = plt.subplots(1, 3, figsize=(24, 7))
+fig.suptitle('Correlation Analysis', fontsize=16, fontweight='bold')
 
-# # Pearson heatmap
-# sns.heatmap(df[numeric_cols].corr(), annot=True, fmt='.2f', cmap='coolwarm',
-#             center=0, linewidths=0.5, ax=axes[0])
-# axes[0].set_title("Numeric–Numeric\n(Pearson)", fontsize=12)
-# axes[0].tick_params(axis='x', rotation=45)
+# Pearson heatmap
+sns.heatmap(df[numeric_cols].corr(), annot=True, fmt='.2f', cmap='coolwarm',
+            center=0, linewidths=0.5, ax=axes[0])
+axes[0].set_title("Numeric–Numeric\n(Pearson)", fontsize=12)
+axes[0].tick_params(axis='x', rotation=45)
 
-# # Cramér's V heatmap
-# sns.heatmap(cramers_matrix.astype(float), annot=True, fmt='.2f', cmap='YlOrRd',
-#             vmin=0, vmax=1, linewidths=0.5, ax=axes[1])
-# axes[1].set_title("Categorical–Categorical\n(Cramér's V)", fontsize=12)
-# axes[1].tick_params(axis='x', rotation=45)
+# Cramér's V heatmap
+sns.heatmap(cramers_matrix.astype(float), annot=True, fmt='.2f', cmap='YlOrRd',
+            vmin=0, vmax=1, linewidths=0.5, ax=axes[1])
+axes[1].set_title("Categorical–Categorical\n(Cramér's V)", fontsize=12)
+axes[1].tick_params(axis='x', rotation=45)
 
-# # Eta squared heatmap
-# sns.heatmap(eta_matrix.astype(float), annot=True, fmt='.2f', cmap='BuGn',
-#             vmin=0, vmax=1, linewidths=0.5, ax=axes[2])
-# axes[2].set_title("Numeric–Categorical\n(Eta Squared)", fontsize=12)
-# axes[2].tick_params(axis='x', rotation=45)
+# Eta squared heatmap
+sns.heatmap(eta_matrix.astype(float), annot=True, fmt='.2f', cmap='BuGn',
+            vmin=0, vmax=1, linewidths=0.5, ax=axes[2])
+axes[2].set_title("Numeric–Categorical\n(Eta Squared)", fontsize=12)
+axes[2].tick_params(axis='x', rotation=45)
 
-# plt.tight_layout()
-# plt.show()
+plt.tight_layout()
+_fname = "photo/correlation_analysis.png"
+plt.savefig(_fname, bbox_inches='tight')
+plt.close()
+print(f'\nFile saved "{_fname}"')
 
 # ----------------------------------------------------------------------------------------------------------------------------------
 # Data Transformation and Encoding
@@ -299,49 +312,34 @@ else:
     print("No SMOTE needed — classes are sufficiently balanced.")
 
 # ----------------------------------------------------------------------------------------------------------------------------------
-
-# Feature Scaling
-print("\nFeature Scaling")
-
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled  = scaler.transform(X_test)
-
-X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_train.columns)
-X_test_scaled  = pd.DataFrame(X_test_scaled,  columns=X_test.columns)
-
-print(f"X_train_scaled shape: {X_train_scaled.shape}")
-print(f"X_test_scaled shape:  {X_test_scaled.shape}")
-print(f"Sample means (should be ≈ 0):\n{X_train_scaled.mean().round(3).to_string()}")
-print(f"Sample stds  (should be ≈ 1):\n{X_train_scaled.std().round(3).to_string()}")
-
-# Save scaler
-joblib.dump(scaler, "model/scaler.pkl")
-
-# ----------------------------------------------------------------------------------------------------------------------------------
-# Modelling and Parameter Tuning
+# Modelling and Parameter Tuning (Already done, so commented out for faster execution)
 # ----------------------------------------------------------------------------------------------------------------------------------
 
 # print("\nModel 1: Decision Tree")
+
 # dt_params = {
 #     'max_depth':        [3, 5, 10, 15, 20, None],
 #     'min_samples_split': [2, 5, 10, 20],
 #     'min_samples_leaf':  [1, 2, 5, 10],
 #     'criterion':        ['gini', 'entropy']
 # }
+
 # dt_base = DecisionTreeClassifier(random_state=42)
+
 # dt_search = RandomizedSearchCV(
 #     dt_base, dt_params,
 #     n_iter=20, cv=5,
 #     scoring='accuracy',
 #     random_state=42, n_jobs=-1, verbose=1
 # )
-# dt_search.fit(X_train_scaled, y_train)
+
+# dt_search.fit(X_train, y_train)
+
 # dt_model = dt_search.best_estimator_
 # print(f"Best params: {dt_search.best_params_}")
 # print(f"Best CV accuracy: {dt_search.best_score_:.4f}")
 
-# ----------------------------------------------------------------------------------------------------------------------------------
+# # ----------------------------------------------------------------------------------------------------------------------------------
 
 # print("\nModel 2: Random Forest")
 
@@ -367,7 +365,6 @@ joblib.dump(scaler, "model/scaler.pkl")
 #     random_state=42, n_jobs=-1, verbose=1
 # )
 
-# # RF dont need scaled data
 # rf_search.fit(X_train, y_train)   
 
 # rf_model = rf_search.best_estimator_
@@ -405,7 +402,7 @@ joblib.dump(scaler, "model/scaler.pkl")
 #     scoring='accuracy',
 #     random_state=42, n_jobs=-1, verbose=1
 # )
-# # XGBoost dont need scaled data
+
 # xgb_search.fit(X_train, y_train)   
 
 # xgb_model = xgb_search.best_estimator_
@@ -432,20 +429,17 @@ models = {
     )
 }
 
-for name, model in models.items():
-    model.fit(X_train_scaled, y_train)
-    joblib.dump(model, f"model/{name}.pkl")
-    
+# ----------------------------------------------------------------------------------------------------------------------------------
+
 label_names = ['Low', 'Medium', 'High']
 results = {}
-
-# ----------------------------------------------------------------------------------------------------------------------------------
 
 # Fit and Train
 for name, model in models.items():
     print(f"\nModel: {name}")
-    model.fit(X_train_scaled, y_train)
-    y_pred = model.predict(X_test_scaled)
+    model.fit(X_train, y_train)
+    joblib.dump(model, f"model/{name}.pkl")
+    y_pred = model.predict(X_test)
 
     acc       = accuracy_score(y_test, y_pred)
     precision = precision_score(y_test, y_pred, average='weighted')
@@ -472,14 +466,20 @@ for name, model in models.items():
 
 # Confusion Matrices
 fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
 fig.suptitle('Confusion Matrices', fontsize=15, fontweight='bold')
+
 for ax, (name, res) in zip(axes, results.items()):
     cm   = confusion_matrix(y_test, res["y_pred"])
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_names)
     disp.plot(ax=ax, colorbar=False, cmap='Blues')
     ax.set_title(f"{name}\nAcc: {res['accuracy']:.4f}", fontsize=11, fontweight='bold')
+
 plt.tight_layout()
-plt.show()
+_fname = "photo/confusion_matrix.png"
+plt.savefig(_fname, bbox_inches='tight')
+plt.close()
+print(f'\nFile saved "{_fname}"')
 
 # ----------------------------------------------------------------------------------------------------------------------------------
 
@@ -506,19 +506,24 @@ for ax, metric, title in zip(axes, metrics, titles):
     ax.tick_params(axis='x', rotation=15)
 
 plt.tight_layout()
-plt.show()
+_fname = "photo/model_performance_comparison.png"
+plt.savefig(_fname, bbox_inches='tight')
+plt.close()
+print(f'\nFile saved "{_fname}"')
 
 # ----------------------------------------------------------------------------------------------------------------------------------
 
 # Summary
-print("\nFINAL SUMMARY")
+print("\nFinal Summary\n")
 
 # CV Accuracy vs Test Accuracy
 print(f"{'Model':<25} {'CV Accuracy':>12} {'Test Accuracy':>14}")
 print("=" * 55)
-cv_scores = {"Decision Tree": 0.9057, "Random Forest": 0.9086, "XGBoost": 0.9167}
+cv_scores = {"Decision Tree": 0.9059, "Random Forest": 0.9086, "XGBoost": 0.9167}
 for name in results:
     print(f"{name:<25} {cv_scores[name]:>12.4f} {results[name]['accuracy']:>14.4f}")
+
+print()
 
 # Summarize the big 4
 print(f"{'Model':<20} {'Accuracy':>10} {'Precision':>10} {'Recall':>10} {'F1 Score':>10}")
